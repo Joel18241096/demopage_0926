@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MusicSTAR: Structure-Aware Temporal Attention Routing for Song Generation from a Single Long Caption</title>
+<style>
+  :root {
+    /* Light theme */
+    --bg: #f5f7fb;
+    --bg-2: #eef2f8;
+    --card: #ffffff;
+    --card-2: #fafbff;
+    --line: #e3e8f2;
+    --line-strong: #cfd6e6;
+    --text: #1c2340;
+    --text-2: #3a4468;
+    --muted: #6b7593;
+    --accent: #5b6cff;
+    --accent-2: #10b981;
+    --accent-3: #f59e0b;
+    --danger: #ef4444;
+    --shadow: 0 6px 20px rgba(30, 41, 90, .08);
+    --shadow-hover: 0 10px 26px rgba(30, 41, 90, .12);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(1000px 500px at 10% -10%, rgba(91, 108, 255, .10), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgba(16, 185, 129, .08), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  a { color: var(--accent); text-decoration: none; }
+
+  /* Layout container */
+  .container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header.hero {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  header.hero h1 {
+    font-size: 34px;
+    letter-spacing: .5px;
+    margin: 0 0 10px;
+    background: linear-gradient(90deg, #5b6cff, #10b981);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header.hero p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 15px;
+  }
+
+  /* Top model legend */
+  .legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 20px auto 0;
+    max-width: 960px;
+  }
+  .legend .chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--text-2);
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend .chip.ours {
+    background: linear-gradient(135deg, rgba(91,108,255,.10), rgba(16,185,129,.10));
+    border-color: rgba(91, 108, 255, .4);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .legend .chip .ours-tag {
+    background: var(--accent);
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    letter-spacing: .5px;
+  }
+
+  /* Sample card */
+  .sample {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 22px 22px 18px;
+    margin: 24px 0;
+    transition: box-shadow .25s ease;
+  }
+  .sample:hover { box-shadow: var(--shadow-hover); }
+
+  .sample-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .sample-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: rgba(91, 108, 255, .10);
+    color: var(--accent);
+    border: 1px solid rgba(91, 108, 255, .25);
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: .3px;
+  }
+  .badge.alt {
+    background: rgba(16, 185, 129, .10);
+    color: var(--accent-2);
+    border-color: rgba(16, 185, 129, .3);
+  }
+
+  /* Info region (collapsible) */
+  .info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 900px) {
+    .info { grid-template-columns: 1fr; }
+  }
+  .info-block {
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .info-block h4 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .info-block .content {
+    font-size: 13px;
+    color: var(--text-2);
+    max-height: 6.5em;
+    overflow: hidden;
+    position: relative;
+    transition: max-height .3s ease;
+  }
+  .info-block.expanded .content { max-height: 200em; }
+  .info-block .fade {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 2.2em;
+    background: linear-gradient(180deg, transparent, var(--card-2));
+    pointer-events: none;
+  }
+  .info-block.expanded .fade { display: none; }
+  .info-block .toggle {
+    background: transparent;
+    color: var(--accent);
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 0 0;
+  }
+
+  /* Lyric block */
+  .lyric-block .content {
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .lyric-block .section-tag {
+    display: inline-block;
+    color: var(--accent-2);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 1px 8px;
+    margin: 0 0 2px;
+    background: rgba(16, 185, 129, .10);
+    border: 1px solid rgba(16, 185, 129, .3);
+    border-radius: 6px;
+  }
+  .lyric-block .lyric-section {
+    margin: 4px 0 10px;
+  }
+  .lyric-block .lyric-section:first-child { margin-top: 0; }
+  .lyric-block .lyric-section:last-child  { margin-bottom: 0; }
+  .lyric-block .lyric-body {
+    margin-top: 4px;
+    padding-left: 4px;
+    color: var(--text-2);
+  }
+  .lyric-block .lyric-body .line {
+    display: block;
+  }
+
+  /* Model comparison list */
+  .models {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 6px;
+  }
+  @media (max-width: 900px) { .models { grid-template-columns: 1fr; } }
+
+  .model-item {
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: border-color .2s ease, background .2s ease;
+  }
+  .model-item:hover { border-color: var(--line-strong); }
+  .model-item.ours {
+    background: linear-gradient(135deg, rgba(91,108,255,.06), rgba(16,185,129,.05));
+    border-color: rgba(91, 108, 255, .35);
+  }
+  .model-name {
+    min-width: 130px;
+    font-weight: 600;
+    letter-spacing: .3px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .model-name .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(91, 108, 255, .15);
+  }
+  .model-item.ours .model-name .dot {
+    background: var(--accent-2);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, .2);
+  }
+  .ours-tag-inline {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    letter-spacing: .5px;
+    margin-left: 4px;
+  }
+
+  /* Custom audio player */
+  .player {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .btn-play {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), #4756e0);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform .15s ease, box-shadow .15s ease;
+    box-shadow: 0 4px 12px rgba(91, 108, 255, .3);
+  }
+  .btn-play:hover { transform: scale(1.06); }
+  .btn-play:active { transform: scale(.96); }
+  .btn-play.playing {
+    background: linear-gradient(135deg, var(--accent-2), #059669);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, .35);
+  }
+  .btn-play svg { width: 16px; height: 16px; }
+
+  /* Progress bar: outer wrapper offers a larger clickable hit area */
+  .progress {
+    flex: 1;
+    position: relative;
+    min-width: 80px;
+    height: 20px;                 /* larger hit area */
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;           /* prevent touch scrolling from interfering */
+    user-select: none;
+  }
+  .progress .track {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    background: #e3e8f2;
+    border-radius: 999px;
+    overflow: visible;
+  }
+  .progress .buffered {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: #d0d7e6;
+    border-radius: 999px;
+    width: 0%;
+  }
+  .progress .played {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 999px;
+  }
+  .progress .thumb {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--accent);
+    transform: translate(-50%, -50%) scale(.6);
+    opacity: 0;
+    transition: transform .15s ease, opacity .15s ease;
+    box-shadow: 0 2px 6px rgba(30, 41, 90, .18);
+  }
+  .progress:hover .thumb,
+  .progress.dragging .thumb {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  .progress.dragging .thumb {
+    box-shadow: 0 2px 10px rgba(91, 108, 255, .5);
+  }
+
+  .time {
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    min-width: 88px;
+    text-align: right;
+  }
+
+  .vol {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+  }
+  .vol input[type="range"] {
+    -webkit-appearance: none;
+    width: 70px;
+    height: 4px;
+    background: #dfe4ee;
+    border-radius: 999px;
+    outline: none;
+  }
+  .vol input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(91, 108, 255, .35);
+  }
+  .vol input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+  .vol svg { width: 16px; height: 16px; opacity: .7; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 30px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="hero">
+    <h1>🎵 MusicSTAR</h1>
+    <p style="font-size:15px;color:var(--text-2);margin:0 0 6px;">Structure-Aware Temporal Attention Routing for Song Generation from a Single Long Caption</p>
+    <p>6 models · 5 test samples · comparing generations under the same Prompt / Lyric</p>
+    <div class="legend" id="legend"></div>
+  </header>
+
+  <div id="samples"></div>
+
+  <footer>
+    ⓘ Click to play / pause · Drag the progress bar to seek · Only one audio track plays at a time
+  </footer>
+</div>
+
+<script>
+/* ============ Data ============ */
+/* Audio is served from Tencent COS (bucket sprproxy-1258344707, ap-shanghai).
+ * URL scheme:  {AUDIO_BASE}/{model}/{demoX}.{ext}
+ * Change AUDIO_BASE to "demo" if you want to switch back to local files. */
+const AUDIO_BASE = "https://sprproxy-1258344707.cos.ap-shanghai.myqcloud.com/ICLR2027_musicstar/samples";
+
+/* MusicSTAR is our method — placed first */
+const MODELS = [
+  { key: "MusicSTAR",  folder: `${AUDIO_BASE}/MusicSTAR`,  ext: "flac", ours: true },
+  { key: "Heartmula",  folder: `${AUDIO_BASE}/Heartmula`,  ext: "wav"  },
+  { key: "Minimax3",   folder: `${AUDIO_BASE}/Minimax3`,   ext: "wav"  },
+  { key: "acestep1.5", folder: `${AUDIO_BASE}/acestep1.5`, ext: "wav"  },
+  { key: "levo2",      folder: `${AUDIO_BASE}/levo2`,      ext: "flac" },
+  { key: "muse",       folder: `${AUDIO_BASE}/muse`,       ext: "wav"  },
+];
+
+const SAMPLES = [
+  {
+    file: "demo1",
+    idx: "IN_208",
+    aspect: "instrumentation",
+    target: "tin whistle, fiddle → fiddle, accordion, acoustic guitar, hand drum → fiddle, accordion, acoustic guitar, hand drum, tin whistle → electric guitar, bass guitar, drum kit, fiddle, accordion → fiddle, accordion, acoustic guitar, hand drum → fiddle, accordion, acoustic guitar, hand drum, tin whistle → electric guitar, bass guitar, drum kit, fiddle, accordion → acoustic guitar, tin whistle, cello → electric guitar, bass guitar, drum kit, fiddle, tin whistle → tin whistle, fiddle",
+    caption: `A ten-section celtic folk song with elements of folk rock ; It opens with a calm and nostalgic intro. Energy is low and holds steady. It is instrumental, with no lead vocal, set over tin whistle and fiddle. The sound is warm, intimate, and acoustic, with a slow and laid-back groove ; Then comes a nostalgic and storytelling verse. Energy is low and holds steady. It is carried by warm and sung male vocals, set over fiddle, accordion, acoustic guitar, and hand drum. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and straight groove ; Next is a hopeful and yearning pre-chorus. Energy is medium and builds throughout. It is carried by warm and sung male vocals, set over fiddle, accordion, acoustic guitar, hand drum, and tin whistle. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and straight groove ; After that comes an uplifting and warm chorus. Energy is medium and holds steady. It is carried by warm and sung male vocals, set over electric guitar, bass guitar, drum kit, fiddle, and accordion. The sound is warm, polished, and organic, with a mid-tempo, driving, and straight groove ; This leads into a nostalgic and storytelling verse. Energy is low and holds steady. It is carried by warm and sung male vocals, set over fiddle, accordion, acoustic guitar, and hand drum. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and straight groove ; Following that is a hopeful and yearning pre-chorus. Energy is medium and builds throughout. It is carried by warm and sung male vocals, set over fiddle, accordion, acoustic guitar, hand drum, and tin whistle. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and straight groove ; Then an uplifting and warm chorus. Energy is medium and holds steady. It is carried by warm and sung male vocals, set over electric guitar, bass guitar, drum kit, fiddle, and accordion. The sound is warm, polished, and organic, with a mid-tempo, driving, and straight groove ; Then comes a reflective and tender bridge. Energy is low and builds throughout. It is carried by warm and sung male vocals, set over acoustic guitar, tin whistle, and cello. The sound is warm, intimate, and acoustic, with a slow and laid-back groove ; Next is an uplifting and warm chorus. Energy is medium and holds steady. It is carried by warm and sung male vocals, set over electric guitar, bass guitar, drum kit, fiddle, and tin whistle. The sound is warm, polished, and organic, with a mid-tempo, driving, and straight groove ; It closes with a serene and nostalgic outro. Energy is low and fades out. It is instrumental, with no lead vocal, set over tin whistle and fiddle. The sound is warm, intimate, and acoustic, with a slow and laid-back groove.`,
+    lyric: `[intro] ; [verse] The ferry leaves at half past six. For the island in the mist. My grandmother waved from the dock. With a handkerchief in her fist. And the fiddler played a parting reel. That echoed o er the foam ; [pre-chorus] Oh the sea she is a widow maker. But she brings us home. Every wave a rolling meadow. Every star a stone ; [chorus] Raise a glass to the island. To the rock and to the wave. To the ones who work the water. To the bold and to the brave. Sing hey for the morning ferry. Sing ho for the evening tide. The island is my mother. And the ocean is my bride ; [verse] The pub is warm with peat smoke. And the stout is dark as night. Old Seamus tells the stories. Of the selkies and the light. And the band strikes up a jig. That sets the floor alight ; [pre-chorus] Oh the sea she is a widow maker. But she brings us home. Every wave a rolling meadow. Every star a stone ; [chorus] Raise a glass to the island. To the rock and to the wave. To the ones who work the water. To the bold and to the brave. Sing hey for the morning ferry. Sing ho for the evening tide. The island is my mother. And the ocean is my bride ; [bridge] And when the storm comes howling. And the boats are tied up tight. We gather by the fire. And sing away the night ; [chorus] Raise a glass to the island. To the rock and to the wave. To the ones who work the water. To the bold and to the brave. Sing hey for the morning ferry. Sing ho for the evening tide. The island is my mother. And the ocean is my bride ; [outro]`,
+  },
+  {
+    file: "demo2",
+    idx: "VL_208",
+    aspect: "vocal_lead",
+    target: "none → raspy, sung, male → smooth, sung, female → raspy, sung, male → smooth, sung, female → raspy, sung, male → smooth, sung, female → none",
+    caption: `An eight-section folk song with elements of americana ; It opens with a calm and nostalgic intro. Energy is low and holds steady. It is instrumental, with no lead vocal, set over fingerpicked acoustic guitar. The sound is warm, intimate, and acoustic, with a slow and laid-back groove ; Then comes a nostalgic and storytelling verse. Energy is low and holds steady. It is carried by raspy and sung male vocals, set over fingerpicked acoustic guitar and upright bass. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and straight groove ; Next is an uplifting and warm chorus. Energy is medium and holds steady. It is carried by smooth and sung female vocals, set over acoustic guitar, banjo, upright bass, brushed drums, and fiddle. The sound is warm, polished, and organic, with a mid-tempo, driving, and straight groove ; After that comes a nostalgic and storytelling verse. Energy is low and holds steady. It is carried by raspy and sung male vocals, set over fingerpicked acoustic guitar and upright bass. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and straight groove ; This leads into an uplifting and warm chorus. Energy is medium and holds steady. It is carried by smooth and sung female vocals, set over acoustic guitar, banjo, upright bass, brushed drums, and fiddle. The sound is warm, polished, and organic, with a mid-tempo, driving, and straight groove ; Following that is a nostalgic and storytelling verse. Energy is low and holds steady. It is carried by raspy and sung male vocals, set over fingerpicked acoustic guitar and upright bass. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and straight groove ; Then an uplifting and warm chorus. Energy is medium and holds steady. It is carried by smooth and sung female vocals, set over acoustic guitar, banjo, upright bass, brushed drums, and fiddle. The sound is warm, polished, and organic, with a mid-tempo, driving, and straight groove ; It ends with a serene and nostalgic outro. Energy is low and fades out. It is instrumental, with no lead vocal, set over fingerpicked acoustic guitar. The sound is warm, intimate, and acoustic, with a slow and laid-back groove.`,
+    lyric: `[intro] ; [verse] Dusty boots on a gravel road. Forty years of heavy loads. My hands are maps of calluses. From everything I owed. But I never owed the sunset. And it never let me down ; [chorus] Rest now. Lay your burdens down. The field is plowed. The day is done. Rest now. Let the evening crown. Everything your heart has won ; [verse] The barn leans to the west a bit. Like me it needs a rest. The fence I built in seventy nine. Has stood up to the test. Some things I fixed with wire and prayer. Some I never fixed ; [chorus] Rest now. Lay your burdens down. The field is plowed. The day is done. Rest now. Let the evening crown. Everything your heart has won ; [verse] My daughter has my father's eyes. And her mother's gentle grace. She says she wants the city lights. I say that is okay. This old dirt will be right here. If she ever needs a place ; [chorus] Rest now. Lay your burdens down. The field is plowed. The day is done. Rest now. Let the evening crown. Everything your heart has won ; [outro]`,
+  },
+  {
+    file: "demo3",
+    idx: "VE_201",
+    aspect: "vocal_ensemble",
+    target: "none → none → two-part harmony → none → three-part harmony → three-part harmony, backing vocals → stacked harmonies, backing vocals, ad-libs → none",
+    caption: `An eight-section pop ballad song with elements of adult contemporary ; It opens with a tender and dreamy intro. Energy is low and builds throughout. It is instrumental, with no lead vocal, set over piano and ambient pad. The sound is warm, intimate, and acoustic, with a slow and laid-back groove ; Then comes a melancholic and tender verse. Energy is low and holds steady. It is carried by breathy and softly sung female vocals, set over piano and soft synth pad. The sound is warm, intimate, and hybrid, with a slow, laid-back, and backbeat groove ; Next is an euphoric and passionate chorus. Energy is high and holds steady. It is carried by powerful and belted female vocals, backed by two-part harmony, set over piano, strings, drum kit, and electric bass. The sound is lush, polished, and hybrid, with a mid-tempo, driving, and backbeat groove ; After that comes a melancholic and tender verse. Energy is low and holds steady. It is carried by breathy and softly sung female vocals, set over piano and soft synth pad. The sound is warm, intimate, and hybrid, with a slow, laid-back, and backbeat groove ; This leads into an euphoric and passionate chorus. Energy is high and holds steady. It is carried by powerful and belted female vocals, backed by three-part harmony, set over piano, strings, drum kit, and electric bass. The sound is lush, polished, and hybrid, with a mid-tempo, driving, and backbeat groove ; Following that is a dramatic and emotional bridge. Energy is medium and builds throughout. It is carried by powerful and belted female vocals, backed by three-part harmony and backing vocals, set over piano, strings, and drum kit. The sound is lush, cinematic, and hybrid, with a mid-tempo, driving, and backbeat groove ; Then an euphoric and passionate chorus. Energy is very high and holds steady. It is carried by powerful and belted female vocals, backed by stacked harmonies, backing vocals, and ad-libs, set over piano, strings, drum kit, and electric bass. The sound is lush, polished, and hybrid, with a mid-tempo, driving, and backbeat groove ; It ends with a bittersweet and serene outro. Energy is low and fades out. It is instrumental, with no lead vocal, set over piano and ambient pad. The sound is warm, intimate, and acoustic, with a slow and laid-back groove.`,
+    lyric: `[intro] ; [verse] The attic stairs still creak the same. The boxes hold the years. Your letters tied with faded string. Have dried a thousand tears. I read them when the rain comes down. And time just disappears ; [chorus] We were golden. We were young. Every word a song unsung. We were endless summer skies. With forever in our eyes. And though the seasons turned us grey. Those golden days remain ; [verse] The porch swing sways in evening air. Like it is keeping time. With every ghost of laughter. Every reason. Every rhyme. The years have been both kind and cruel. But they left us this prime ; [chorus] We were golden. We were young. Every word a song unsung. We were endless summer skies. With forever in our eyes. And though the seasons turned us grey. Those golden days remain ; [bridge] Hold the faded photographs. Up to the evening light. We are still inside them somewhere. Golden and bright ; [chorus] We were golden. We were young. Every word a song unsung. We were endless summer skies. With forever in our eyes. And though the seasons turned us grey. Those golden days remain. Golden days remain ; [outro]`,
+  },
+  {
+    file: "demo4",
+    idx: "MD_101",
+    aspect: "mood",
+    target: "melancholic, quiet → melancholic, tender → hopeful, gentle → uplifting, warm → calm, hopeful → melancholic, tender → hopeful, gentle → uplifting, warm → serene, hopeful",
+    caption: `A nine-section mandopop song with elements of healing ballad ; It opens with a melancholic and quiet intro. Energy is low and builds throughout. It is instrumental, with no lead vocal, set over piano and strings. The sound is warm, intimate, and acoustic, with a slow and laid-back groove ; Then comes a melancholic and tender verse. Energy is low and holds steady. It is carried by breathy and softly sung female vocals, set over piano and acoustic guitar. The sound is warm, intimate, and acoustic, with a slow, laid-back, and backbeat groove ; Next is a hopeful and gentle pre-chorus. Energy is medium and builds throughout. It is carried by breathy and softly sung female vocals, set over piano, strings, and acoustic guitar. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and backbeat groove ; After that comes an uplifting and warm chorus. Energy is high and holds steady. It is carried by powerful and belted female vocals, set over piano, strings, electric guitar, and drum kit. The sound is lush, polished, and hybrid, with a mid-tempo, driving, and backbeat groove ; This leads into a calm and hopeful instrumental section. Energy is medium and builds throughout. It is instrumental, with no lead vocal, set over piano, strings, and acoustic guitar. The sound is warm, intimate, and acoustic, with a mid-tempo and laid-back groove ; Following that is a melancholic and tender verse. Energy is low and holds steady. It is carried by breathy and softly sung female vocals, set over piano and acoustic guitar. The sound is warm, intimate, and acoustic, with a slow, laid-back, and backbeat groove ; Then a hopeful and gentle pre-chorus. Energy is medium and builds throughout. It is carried by breathy and softly sung female vocals, set over piano, strings, and acoustic guitar. The sound is warm, intimate, and acoustic, with a mid-tempo, laid-back, and backbeat groove ; Then comes an uplifting and warm chorus. Energy is high and holds steady. It is carried by powerful and belted female vocals, set over piano, strings, electric guitar, and drum kit. The sound is lush, polished, and hybrid, with a mid-tempo, driving, and backbeat groove ; The song closes with a serene and hopeful outro. Energy is low and fades out. It is instrumental, with no lead vocal, set over piano and strings. The sound is warm, intimate, and acoustic, with a slow and laid-back groove.`,
+    lyric: `[intro] ; [verse] 今夜雨下得很大. 像天空在替我哭泣. 我抱着膝盖坐在窗前. 数着玻璃上的水滴. 一滴两滴三滴. 都是说不出的委屈 ; [pre-chorus] 可是雨总会停的啊. 乌云总会散去的. 你看天边那一点亮光. 是太阳在等你 ; [chorus] 擦干眼泪抬起头. 彩虹就在风雨后. 生活虽然有点苦. 但你一定要记得微笑. 擦干眼泪向前走. 阳光会照进窗口. 这世界爱你的人. 比你想象的还要多 ; [inst] ; [verse] 今夜风刮得很急. 像命运在考验着我. 我裹紧了单薄的外套. 数着路灯的数量. 一盏两盏三盏. 照亮前行的方向 ; [pre-chorus] 可是风总会停的啊. 黑夜总会过去的. 你看天边那一片鱼肚白. 是黎明在等你 ; [chorus] 擦干眼泪抬起头. 彩虹就在风雨后. 生活虽然有点苦. 但你一定要记得微笑. 擦干眼泪向前走. 阳光会照进窗口. 这世界爱你的人. 比你想象的还要多 ; [outro]`,
+  },
+  {
+    file: "demo5",
+    idx: "IN_106",
+    aspect: "instrumentation",
+    target: "synth pad, drum machine → synth pad, drum machine, synth bass → acoustic guitar, upright piano, brushed drums, upright bass → synth pad, drum machine, synth bass → acoustic guitar, upright piano, brushed drums, upright bass → upright piano, cello → acoustic guitar, upright piano, brushed drums, upright bass → acoustic guitar",
+    caption: `An eight-section electronic song with elements of acoustic pop ; It opens with a dreamy and suspended intro. Energy is low and builds throughout. It is instrumental, with no lead vocal, set over synth pad and drum machine. The sound is cold, polished, and electronic, with a slow and sparse pulse groove ; Then comes a dreamy and introspective verse. Energy is medium and holds steady. It is carried by breathy and softly sung female vocals, set over synth pad, drum machine, and synth bass. The sound is clean, polished, and electronic, with a mid-tempo, laid-back, and backbeat groove ; Next is an euphoric and uplifting chorus. Energy is high and holds steady. It is carried by bright and sung female vocals, set over acoustic guitar, upright piano, brushed drums, and upright bass. The sound is bright, polished, and organic, with a uptempo, driving, and four-on-the-floor groove ; After that comes a dreamy and introspective verse. Energy is medium and holds steady. It is carried by breathy and softly sung female vocals, set over synth pad, drum machine, and synth bass. The sound is clean, polished, and electronic, with a mid-tempo, laid-back, and backbeat groove ; This leads into an euphoric and uplifting chorus. Energy is high and holds steady. It is carried by bright and sung female vocals, set over acoustic guitar, upright piano, brushed drums, and upright bass. The sound is bright, polished, and organic, with a uptempo, driving, and four-on-the-floor groove ; Following that is a suspended and dreamy bridge. Energy is medium and builds throughout. It is carried by bright and sung female vocals, set over upright piano and cello. The sound is warm, intimate, and acoustic, with a mid-tempo and halftime groove ; Then an euphoric and uplifting chorus. Energy is high and holds steady. It is carried by bright and sung female vocals, set over acoustic guitar, upright piano, brushed drums, and upright bass. The sound is bright, polished, and organic, with a uptempo, driving, and four-on-the-floor groove ; It ends with a dreamy and serene outro. Energy is low and fades out. It is instrumental, with no lead vocal, set over acoustic guitar. The sound is warm, intimate, and acoustic, with a slow and sparse pulse groove.`,
+    lyric: `[intro] ; [verse] 屏幕亮了一整夜. 代码写了上千行. 咖啡杯空了又满. 窗外天光微微亮. 我在这数字的森林里. 寻找一颗真实的心脏 ; [chorus] 脱下所有的盔甲. 卸下所有的伪装. 我只想简简单单地. 坐在阳光下弹着吉他唱. 没有滤镜没有特效. 只有风穿过指缝的清凉. 这才是我最真的模样 ; [verse] 朋友圈里的完美人生. 滤镜下的精致脸庞. 点赞数涨了又涨. 心里却空了一块地方. 我在这虚拟的花园里. 怀念泥土的芬芳 ; [chorus] 脱下所有的盔甲. 卸下所有的伪装. 我只想简简单单地. 坐在阳光下弹着吉他唱. 没有滤镜没有特效. 只有风穿过指缝的清凉. 这才是我最真的模样 ; [bridge] 真实一点. 简单一点. 慢一点. 再慢一点 ; [chorus] 脱下所有的盔甲. 卸下所有的伪装. 我只想简简单单地. 坐在阳光下弹着吉他唱. 没有滤镜没有特效. 只有风穿过指缝的清凉. 这才是我最真的模样 ; [outro]`,
+  },
+];
+
+/* ============ SVG icons ============ */
+const ICON_PLAY  = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+const ICON_VOL   = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0 0 14 8.05v7.9A4.5 4.5 0 0 0 16.5 12z"/></svg>';
+
+/* ============ Utilities ============ */
+function fmtTime(s) {
+  if (!isFinite(s) || s < 0) return "0:00";
+  const m = Math.floor(s / 60);
+  const r = Math.floor(s % 60);
+  return `${m}:${r.toString().padStart(2, "0")}`;
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function renderLyric(s) {
+  // Split into sections by ";" and render each as: [tag] header + body lines.
+  const sections = s.split(";").map(x => x.trim()).filter(Boolean);
+  const parts = sections.map(sec => {
+    // Extract the leading [tag] (if any) from this section
+    const m = sec.match(/^\s*\[([^\]]+)\](.*)$/);
+    let tag = "", body = sec;
+    if (m) {
+      tag  = m[1].trim();
+      body = m[2].trim();
+    }
+    // Split the body into lines on "." so each phrase sits on its own line.
+    // The trailing period is re-appended for readability.
+    let lines = [];
+    if (body) {
+      lines = body.split(".").map(x => x.trim()).filter(Boolean);
+    }
+
+    const header = tag
+      ? `<span class="section-tag">${escapeHtml(tag)}</span>`
+      : "";
+    const bodyHtml = lines.length
+      ? `<div class="lyric-body">${lines.map(l => `<span class="line">${escapeHtml(l)}.</span>`).join("")}</div>`
+      : "";
+    return `<div class="lyric-section">${header}${bodyHtml}</div>`;
+  });
+  return parts.join("");
+}
+function renderTarget(s) {
+  return escapeHtml(s).replace(/→/g, '<span style="color:var(--accent);margin:0 4px;">→</span>');
+}
+
+/* ============ Global playback manager: only one audio plays at a time ============ */
+const allAudios = [];
+function pauseAllExcept(current) {
+  allAudios.forEach(a => {
+    if (a !== current && !a.paused) a.pause();
+  });
+}
+
+/* ============ Rendering ============ */
+function renderLegend() {
+  const el = document.getElementById("legend");
+  el.innerHTML = MODELS.map(m =>
+    m.ours
+      ? `<span class="chip ours">${escapeHtml(m.key)}<span class="ours-tag">Ours</span></span>`
+      : `<span class="chip">${escapeHtml(m.key)}</span>`
+  ).join("");
+}
+
+function renderSamples() {
+  const root = document.getElementById("samples");
+  root.innerHTML = SAMPLES.map((s, i) => `
+    <section class="sample">
+      <div class="sample-head">
+        <div class="sample-title">
+          <span class="badge">Sample ${i + 1}</span>
+          <span>idx: ${escapeHtml(s.idx)}</span>
+          <span class="badge alt">${escapeHtml(s.aspect)}</span>
+        </div>
+      </div>
+
+      <div class="info">
+        <div class="info-block" data-block>
+          <h4>Test Target (${escapeHtml(s.aspect)})</h4>
+          <div class="content">${renderTarget(s.target)}<div class="fade"></div></div>
+          <button class="toggle" data-toggle>Expand ▾</button>
+        </div>
+        <div class="info-block" data-block>
+          <h4>Caption</h4>
+          <div class="content">${escapeHtml(s.caption)}<div class="fade"></div></div>
+          <button class="toggle" data-toggle>Expand ▾</button>
+        </div>
+      </div>
+
+      <div class="info-block lyric-block" data-block style="margin-bottom:16px;">
+        <h4>GT Lyric</h4>
+        <div class="content">${renderLyric(s.lyric)}<div class="fade"></div></div>
+        <button class="toggle" data-toggle>Expand ▾</button>
+      </div>
+
+      <div class="models">
+        ${MODELS.map(m => renderModelItem(m, s)).join("")}
+      </div>
+    </section>
+  `).join("");
+
+  // Collapse / expand toggles
+  root.querySelectorAll("[data-block]").forEach(block => {
+    const btn = block.querySelector("[data-toggle]");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      block.classList.toggle("expanded");
+      btn.textContent = block.classList.contains("expanded") ? "Collapse ▴" : "Expand ▾";
+    });
+  });
+
+  // Initialise players
+  root.querySelectorAll(".player").forEach(bindPlayer);
+}
+
+function renderModelItem(m, s) {
+  const src = `${m.folder}/${s.file}.${m.ext}`;
+  const oursCls  = m.ours ? " ours" : "";
+  const oursTag  = m.ours ? ' <span class="ours-tag-inline">Ours</span>' : "";
+  return `
+    <div class="model-item${oursCls}">
+      <div class="model-name">
+        <span class="dot"></span>${escapeHtml(m.key)}${oursTag}
+      </div>
+      <div class="player" data-src="${src}">
+        <button class="btn-play" title="Play / Pause" aria-label="Play / Pause">${ICON_PLAY}</button>
+        <div class="progress" role="slider" aria-label="Progress" tabindex="0">
+          <div class="track">
+            <div class="buffered"></div>
+            <div class="played"></div>
+            <div class="thumb"></div>
+          </div>
+        </div>
+        <div class="time">0:00 / 0:00</div>
+        <div class="vol">${ICON_VOL}<input type="range" min="0" max="1" step="0.01" value="0.9" aria-label="Volume"/></div>
+        <audio preload="auto" src="${src}"></audio>
+      </div>
+    </div>
+  `;
+}
+
+/* ============ Player behaviour ============ */
+function bindPlayer(root) {
+  const audio    = root.querySelector("audio");
+  const btn      = root.querySelector(".btn-play");
+  const progress = root.querySelector(".progress");
+  const played   = root.querySelector(".played");
+  const buffered = root.querySelector(".buffered");
+  const thumb    = root.querySelector(".thumb");
+  const timeEl   = root.querySelector(".time");
+  const volEl    = root.querySelector(".vol input");
+
+  allAudios.push(audio);
+  audio.volume = parseFloat(volEl.value);
+
+  /* -------- Play / pause -------- */
+  btn.addEventListener("click", () => {
+    if (audio.paused) {
+      pauseAllExcept(audio);
+      audio.play().catch(err => console.warn("play failed:", err));
+    } else {
+      audio.pause();
+    }
+  });
+
+  audio.addEventListener("play",  () => { btn.classList.add("playing");    btn.innerHTML = ICON_PAUSE; });
+  audio.addEventListener("pause", () => { btn.classList.remove("playing"); btn.innerHTML = ICON_PLAY;  });
+  audio.addEventListener("ended", () => { btn.classList.remove("playing"); btn.innerHTML = ICON_PLAY;  });
+
+  /* -------- UI updates -------- */
+  let dragging = false;      // whether the user is currently dragging
+  let pendingSeekRatio = -1; // target ratio queued while duration is still unknown
+
+  const setUiPercent = (pct) => {
+    played.style.width = pct + "%";
+    thumb.style.left   = pct + "%";
+  };
+
+  const refreshFromAudio = () => {
+    if (dragging) return; // while dragging, do not overwrite UI with audio's currentTime
+    const dur = audio.duration || 0;
+    const cur = audio.currentTime || 0;
+    const pct = dur ? (cur / dur) * 100 : 0;
+    setUiPercent(pct);
+    timeEl.textContent = `${fmtTime(cur)} / ${fmtTime(dur)}`;
+  };
+  audio.addEventListener("loadedmetadata", refreshFromAudio);
+  audio.addEventListener("durationchange", refreshFromAudio);
+  audio.addEventListener("timeupdate", refreshFromAudio);
+
+  audio.addEventListener("progress", () => {
+    try {
+      if (audio.buffered.length && audio.duration) {
+        const end = audio.buffered.end(audio.buffered.length - 1);
+        buffered.style.width = (end / audio.duration) * 100 + "%";
+      }
+    } catch (e) { /* noop */ }
+  });
+
+  audio.addEventListener("error", () => {
+    timeEl.textContent = "Load failed";
+    btn.disabled = true;
+    btn.style.opacity = .5;
+    btn.style.cursor = "not-allowed";
+  });
+
+  /* -------- Drag the progress bar (Pointer Events + Pointer Capture) -------- */
+  const ratioFromEvent = (e) => {
+    const rect = progress.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    return Math.min(1, Math.max(0, x / rect.width));
+  };
+
+  const applySeek = (ratio) => {
+    // If metadata is not ready yet, trigger loading first
+    if (!isFinite(audio.duration) || audio.duration <= 0) {
+      try { audio.load(); } catch (_) {}
+      pendingSeekRatio = ratio;
+      // Perform the seek once duration becomes available
+      const onReady = () => {
+        if (pendingSeekRatio >= 0 && isFinite(audio.duration) && audio.duration > 0) {
+          try { audio.currentTime = pendingSeekRatio * audio.duration; } catch (_) {}
+          pendingSeekRatio = -1;
+        }
+        audio.removeEventListener("loadedmetadata", onReady);
+        audio.removeEventListener("durationchange", onReady);
+      };
+      audio.addEventListener("loadedmetadata", onReady);
+      audio.addEventListener("durationchange", onReady);
+      return;
+    }
+    try {
+      audio.currentTime = ratio * audio.duration;
+    } catch (err) {
+      console.warn("seek failed:", err);
+    }
+  };
+
+  progress.addEventListener("pointerdown", (e) => {
+    // Only respond to left button / touch / pen
+    if (e.button !== undefined && e.button !== 0) return;
+    dragging = true;
+    progress.classList.add("dragging");
+    try { progress.setPointerCapture(e.pointerId); } catch (_) {}
+
+    const ratio = ratioFromEvent(e);
+    setUiPercent(ratio * 100);
+    const dur = audio.duration || 0;
+    timeEl.textContent = `${fmtTime(ratio * dur)} / ${fmtTime(dur)}`;
+    e.preventDefault();
+  });
+
+  progress.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const ratio = ratioFromEvent(e);
+    setUiPercent(ratio * 100);
+    const dur = audio.duration || 0;
+    timeEl.textContent = `${fmtTime(ratio * dur)} / ${fmtTime(dur)}`;
+  });
+
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    progress.classList.remove("dragging");
+    try { progress.releasePointerCapture(e.pointerId); } catch (_) {}
+    const ratio = ratioFromEvent(e);
+    applySeek(ratio);
+  };
+  progress.addEventListener("pointerup", endDrag);
+  progress.addEventListener("pointercancel", endDrag);
+
+  // Keyboard accessibility: ←/→ seek backward/forward by 5s
+  progress.addEventListener("keydown", (e) => {
+    if (!isFinite(audio.duration) || audio.duration <= 0) return;
+    if (e.key === "ArrowRight") {
+      audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
+      e.preventDefault();
+    } else if (e.key === "ArrowLeft") {
+      audio.currentTime = Math.max(0, audio.currentTime - 5);
+      e.preventDefault();
+    }
+  });
+
+  /* -------- Volume -------- */
+  volEl.addEventListener("input", () => {
+    audio.volume = parseFloat(volEl.value);
+  });
+}
+
+/* ============ Bootstrap ============ */
+renderLegend();
+renderSamples();
+</script>
+</body>
+</html>
